@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="do7-resigner-cli/do7-resigner-cli.csproj" />
+  <Project Path="DoubleO7evenResignerCore/DoubleO7evenResignerCore.csproj" />
+  <Project Path="QualityControl.xUnit/QualityControl.xUnit.csproj" Id="578fb9ad-a8c9-4d6f-985e-0b82bc50c9f7" />
+</Solution>
