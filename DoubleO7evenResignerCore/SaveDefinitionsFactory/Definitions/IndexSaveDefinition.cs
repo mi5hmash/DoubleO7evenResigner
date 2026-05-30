@@ -1,6 +1,7 @@
-﻿namespace DoubleO7evenResignerCore.Definitions;
+﻿namespace DoubleO7evenResignerCore.SaveDefinitionsFactory.Definitions;
 
-public class IndexSaveDefinition : SaveDataFileDefinition
+[SaveDefinitionType(SaveDefinitionEnum.Index)]
+public sealed class IndexSaveDefinition : DefaultSaveDefinition
 {
     public override string FileName => "index";
     public override bool SupportsCompression => false;

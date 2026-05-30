@@ -1,6 +1,7 @@
-﻿using DoubleO7evenResignerCore.Definitions;
-using DoubleO7evenResignerCore.Helpers;
+﻿using DoubleO7evenResignerCore.Helpers;
 using DoubleO7evenResignerCore.Infrastructure;
+using DoubleO7evenResignerCore.SaveDefinitionsFactory;
+using DoubleO7evenResignerCore.SaveDefinitionsFactory.Definitions;
 using Mi5hmasH.GameLaunchers.Steam.Types;
 using Mi5hmasH.Logger;
 
@@ -47,8 +48,10 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
         // Get signature from Steam ID
         var localUserId = userId ?? "0";
         var steamId = new SteamId(localUserId);
+        // Define action
+        var action = shouldCompress ? "signed_compressed" : "signed";
         // Create a new folder in OUTPUT directory
-        var outputDir = Directories.GetNewOutputDirectory("signed").AddUserId(localUserId);
+        var outputDir = Directories.GetNewOutputDirectory(action).AddUserId(localUserId);
         Directory.CreateDirectory(outputDir);
         // Crate the folder structure in the newly created output directory
         Directories.CreateOutputFolderStructure(filesToProcess, inputDir, outputDir);
@@ -151,8 +154,10 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
         // Get signature from Steam ID
         var localUserId = userId ?? "0";
         var steamId = new SteamId(localUserId);
+        // Define action
+        var action = shouldDecompress ? "unsigned_decompressed" : "unsigned";
         // Create a new folder in OUTPUT directory
-        var outputDir = Directories.GetNewOutputDirectory("unsigned").AddUserId("0");
+        var outputDir = Directories.GetNewOutputDirectory(action).AddUserId(localUserId);
         Directory.CreateDirectory(outputDir);
         // Crate the folder structure in the newly created output directory
         Directories.CreateOutputFolderStructure(filesToProcess, inputDir, outputDir);

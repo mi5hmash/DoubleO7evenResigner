@@ -1,6 +1,7 @@
 using DoubleO7evenResignerCore;
-using DoubleO7evenResignerCore.Definitions;
 using DoubleO7evenResignerCore.Helpers;
+using DoubleO7evenResignerCore.SaveDefinitionsFactory;
+using DoubleO7evenResignerCore.SaveDefinitionsFactory.Definitions;
 using Mi5hmasH.GameLaunchers.Steam.Types;
 using Mi5hmasH.Logger;
 
@@ -26,7 +27,30 @@ public sealed class DoubleO7evenResignerCoreTests : IDisposable
     {
         _output.WriteLine("CLEANUP");
     }
-    
+
+    [Theory]
+    [InlineData("save_12345.sav")]
+    [InlineData("index.save")]
+    [InlineData("data.save")]
+    public void SaveDefinitionRegistry_DoesNotThrow_WhenGetDefinition(string fileName)
+    {
+        // Arrange
+        var testResult = true;
+
+        // Act
+        try
+        {
+            _ = SaveDefinitionRegistry.Get(fileName);
+        }
+        catch
+        {
+            testResult = false;
+        }
+
+        // Assert
+        Assert.True(testResult);
+    }
+
     [Fact]
     public async Task UnsignFilesAsync_DoesNotThrow_WhenNoFiles()
     {

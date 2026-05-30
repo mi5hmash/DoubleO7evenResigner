@@ -10,7 +10,7 @@
 This application can **sign and unsign SaveData files** from the "007 First Light" game. It can also **compress and decompress these SaveData files** and **re-sign them** with your own SteamID to **use anyone’s SaveData on your Steam Account**.
 
 ## Supported Platforms
-|Platform|files Signed|
+|Platform|File Signature|
 |---|---|
 |STEAM|✅ signed with Steam ID|
 |EPIC|❌ not signed|
