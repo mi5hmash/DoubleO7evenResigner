@@ -11,23 +11,24 @@ public static class SaveDefinitionRegistry
     {
         Definitions = new Dictionary<string, ISaveDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        var ns = typeof(DefaultSaveDefinition).Namespace;
+        var ns = typeof(DefaultSaveDefinition).Namespace!;
         var baseType = typeof(ISaveDefinition);
-        const bool inherit = false;
 
         var elements = AppDomain.CurrentDomain
             .GetAssemblies()
             .SelectMany(a => a.GetTypes())
             .Where(t =>
-                t.Namespace == ns &&
+                t.Namespace != null &&
+                t.Namespace.StartsWith(ns) &&
                 !t.IsAbstract &&
                 baseType.IsAssignableFrom(t) &&
-                t.GetCustomAttribute<SaveDefinitionTypeAttribute>(inherit) != null);
+                t.GetCustomAttribute<SaveDefinitionTypeAttribute>(false) != null);
 
         foreach (var type in elements)
         {
             var instance = (ISaveDefinition)Activator.CreateInstance(type)!;
-            Definitions[instance.FullFileName] = instance;
+            if (!Definitions.TryAdd(instance.FullFileName, instance))
+                throw new InvalidOperationException($"Duplicate SaveDefinition for file '{instance.FullFileName}' in {type.FullName}");
         }
     }
 
