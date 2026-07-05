@@ -4,6 +4,7 @@ using DoubleO7evenResignerCore.SaveDefinitionsFactory;
 using DoubleO7evenResignerCore.SaveDefinitionsFactory.Definitions;
 using Mi5hmasH.GameLaunchers.Steam.Types;
 using Mi5hmasH.Logger;
+using Mi5hmasH.Progress;
 
 namespace QualityControl.xUnit;
 

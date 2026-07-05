@@ -1,11 +1,12 @@
 ﻿using DoubleO7evenResignerCore;
-using DoubleO7evenResignerCore.Helpers;
 using DoubleO7evenResignerCore.Infrastructure;
 using Mi5hmasH.AppInfo;
 using Mi5hmasH.ConsoleHelper;
 using Mi5hmasH.Logger;
+using Mi5hmasH.Logger.Enums;
+using Mi5hmasH.Logger.LogProvidersFactory.LogProviders;
 using Mi5hmasH.Logger.Models;
-using Mi5hmasH.Logger.Providers;
+using Mi5hmasH.Progress;
 
 #region SETUP
 
@@ -31,7 +32,7 @@ logger.AddProvider(fileLogProvider);
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
 {
     if (e.ExceptionObject is not Exception exception) return;
-    var logEntry = new LogEntry(SimpleLogger.LogSeverity.Critical, $"Unhandled Exception: {exception}");
+    var logEntry = new LogEntry(LogSeverityEnum.Critical, $"Unhandled Exception: {exception}");
     fileLogProvider.Log(logEntry);
     fileLogProvider.Flush();
 };
@@ -168,13 +169,13 @@ string GetValidatedInputRootPath()
 
 async Task UnsignAll()
 {
-    var cts = new CancellationTokenSource();
+    using var cts = new CancellationTokenSource();
     var inputRootPath = GetValidatedInputRootPath();
     var shouldGuess = arguments.ContainsKey("-g");
     string? userId;
     if (shouldGuess)
     {
-        var guessedValue = await core.GuessUserIdAsync(inputRootPath, cts);
+        var guessedValue = await core.GuessUserIdAsync(inputRootPath);
         userId = guessedValue.ToString();
     }
     else
@@ -185,29 +186,27 @@ async Task UnsignAll()
     
     // Process Files
     await core.UnsignFilesAsync(inputRootPath, cts, userId, shouldDecompress);
-    cts.Dispose();
 }
 
 async Task SignAll()
 {
-    var cts = new CancellationTokenSource();
+    using var cts = new CancellationTokenSource();
     arguments.TryGetValue("-u", out var userId);
     var shouldCompress = arguments.ContainsKey("-z");
     var inputRootPath = GetValidatedInputRootPath();
     // Process Files
     await core.SignFilesAsync(inputRootPath, cts, userId, shouldCompress);
-    cts.Dispose();
 }
 
 async Task ResignAll()
 {
-    var cts = new CancellationTokenSource();
+    using var cts = new CancellationTokenSource();
     var inputRootPath = GetValidatedInputRootPath();
     var shouldGuess = arguments.ContainsKey("-g");
     string? userIdInput;
     if (shouldGuess)
     {
-        var guessedValue = await core.GuessUserIdAsync(inputRootPath, cts);
+        var guessedValue = await core.GuessUserIdAsync(inputRootPath);
         userIdInput = guessedValue.ToString() ?? throw new ArgumentException("Failed to guess User ID.");
     }
     else
@@ -223,15 +222,12 @@ async Task ResignAll()
     
     // Re-sign Files
     await core.ResignFilesAsync(inputRootPath, userIdInput, userIdOutput, cts);
-    cts.Dispose();
 }
 
 async Task GuessUserId()
 {
-    var cts = new CancellationTokenSource();
     var inputRootPath = GetValidatedInputRootPath();
-    await core.GuessUserIdAsync(inputRootPath, cts);
-    cts.Dispose();
+    await core.GuessUserIdAsync(inputRootPath);
 }
 
 #endregion

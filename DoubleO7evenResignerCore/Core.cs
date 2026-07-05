@@ -4,6 +4,7 @@ using DoubleO7evenResignerCore.SaveDefinitionsFactory;
 using DoubleO7evenResignerCore.SaveDefinitionsFactory.Definitions;
 using Mi5hmasH.GameLaunchers.Steam.Types;
 using Mi5hmasH.Logger;
+using Mi5hmasH.Progress;
 
 namespace DoubleO7evenResignerCore;
 
@@ -20,6 +21,14 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
             CancellationToken = cts.Token,
             MaxDegreeOfParallelism = Math.Max(Environment.ProcessorCount - 1, 1)
         };
+
+    /// <summary>
+    /// Marks the progress reporting as complete by reporting 100% progress.
+    /// </summary>
+    /// <param name="progressTracker">The progress tracker used to report progress.</param>
+    /// <param name="errorCounter">The error counter used to report errors.</param>
+    private void LogAllTasksCompleted(ProgressTracker progressTracker, ErrorCounter errorCounter)
+        => logger.LogInfo($"{progressTracker} All tasks completed. {errorCounter}");
 
     /// <summary>
     /// Signs save files from the specified directory using a Steam user ID and writes the results to a new output directory.
@@ -41,10 +50,18 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
     public void SignFiles(string inputDir, CancellationTokenSource cts, string? userId = null, bool shouldCompress = false)
     {
         // GET FILES TO PROCESS
-        var filesToProcess = SaveDataFileIo.GetFiles(inputDir);
-        if (filesToProcess.Length == 0) return;
+        string[] filesToProcess;
+        try { filesToProcess = SaveDataFileIo.GetFiles(inputDir); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex.Message);
+            return;
+        }
+        // INITIALIZE PROGRESS TRACKER
+        var progressTracker = new ProgressTracker(filesToProcess.Length);
+        var errorCounter = new ErrorCounter(logger);
         // PROCESS FILES
-        logger.LogInfo($"Processing [{filesToProcess.Length}] files...");
+        logger.LogInfo($"Processing [{progressTracker.Total}] files...");
         // Get signature from Steam ID
         var localUserId = userId ?? "0";
         var steamId = new SteamId(localUserId);
@@ -58,7 +75,6 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
         // Setup parallel options
         var po = GetParallelOptions(cts);
         // Process files in parallel
-        var progress = 0;
         try
         {
             Parallel.For((long)0, filesToProcess.Length, po, (ctr, _) =>
@@ -73,8 +89,8 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     try { data = File.ReadAllBytes(filesToProcess[ctr]); }
                     catch (Exception ex)
                     {
-                        logger.LogError($"[{progress}/{filesToProcess.Length}] Failed to read the [{fileName}] file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to read the [{fileName}] file: {ex}", group);
+                        break;
                     }
                     // Try to process the file data
                     var dataSpan = data.AsSpan(); 
@@ -93,8 +109,8 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"[{progress}/{filesToProcess.Length}] Failed to process the [{fileName}] file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to process the [{fileName}] file: {ex}", group);
+                        break;
                     }
                     // Try to save the processed file data
                     try
@@ -105,25 +121,24 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"Failed to save the file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to save the file: {ex}", group);
+                        break;
                     }
-                    logger.LogInfo($"[{progress}/{filesToProcess.Length}] Processed the [{fileName}] file.", group);
+                    logger.LogInfo($"{progressTracker} Processed the [{fileName}] file.", group);
                     break;
                 }
-                Interlocked.Increment(ref progress);
-                progressReporter.Report((int)((double)progress / filesToProcess.Length * 100));
+                progressTracker.Increment();
+                progressReporter.Report(progressTracker.Percentage);
             });
-            logger.LogInfo($"[{progress}/{filesToProcess.Length}] All tasks completed.");
+            LogAllTasksCompleted(progressTracker, errorCounter);
         }
         catch (OperationCanceledException ex)
         {
-            logger.LogWarning(ex.Message);
+            errorCounter.AddWarning(ex.Message);
         }
         finally
         {
-            // Ensure progress is set to 100% at the end
-            progressReporter.Report(100);
+            progressReporter.Complete();
         }
     }
 
@@ -147,10 +162,18 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
     public void UnsignFiles(string inputDir, CancellationTokenSource cts, string? userId = null, bool shouldDecompress = false)
     {
         // GET FILES TO PROCESS
-        var filesToProcess = SaveDataFileIo.GetFiles(inputDir);
-        if (filesToProcess.Length == 0) return;
+        string[] filesToProcess;
+        try { filesToProcess = SaveDataFileIo.GetFiles(inputDir); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex.Message);
+            return;
+        }
+        // INITIALIZE PROGRESS TRACKER
+        var progressTracker = new ProgressTracker(filesToProcess.Length);
+        var errorCounter = new ErrorCounter(logger);
         // PROCESS FILES
-        logger.LogInfo($"Processing [{filesToProcess.Length}] files...");
+        logger.LogInfo($"Processing [{progressTracker.Total}] files...");
         // Get signature from Steam ID
         var localUserId = userId ?? "0";
         var steamId = new SteamId(localUserId);
@@ -164,7 +187,6 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
         // Setup parallel options
         var po = GetParallelOptions(cts);
         // Process files in parallel
-        var progress = 0;
         try
         {
             Parallel.For((long)0, filesToProcess.Length, po, (ctr, _) =>
@@ -179,8 +201,8 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     try { data = File.ReadAllBytes(filesToProcess[ctr]); }
                     catch (Exception ex)
                     {
-                        logger.LogError($"[{progress}/{filesToProcess.Length}] Failed to read the [{fileName}] file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to read the [{fileName}] file: {ex}", group);
+                        break;
                     }
                     // Try to process the file data
                     var dataSpan = data.AsSpan();
@@ -200,8 +222,8 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"[{progress}/{filesToProcess.Length}] Failed to process the [{fileName}] file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to process the [{fileName}] file: {ex}", group);
+                        break;
                     }
                     // Try to save the processed file data
                     try
@@ -212,25 +234,24 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"Failed to save the file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to save the file: {ex}", group);
+                        break;
                     }
-                    logger.LogInfo($"[{progress}/{filesToProcess.Length}] Processed the [{fileName}] file.", group);
+                    logger.LogInfo($"{progressTracker} Processed the [{fileName}] file.", group);
                     break;
                 }
-                Interlocked.Increment(ref progress);
-                progressReporter.Report((int)((double)progress / filesToProcess.Length * 100));
+                progressTracker.Increment();
+                progressReporter.Report(progressTracker.Percentage);
             });
-            logger.LogInfo($"[{progress}/{filesToProcess.Length}] All tasks completed.");
+            LogAllTasksCompleted(progressTracker, errorCounter);
         }
         catch (OperationCanceledException ex)
         {
-            logger.LogWarning(ex.Message);
+            errorCounter.AddWarning(ex.Message);
         }
         finally
         {
-            // Ensure progress is set to 100% at the end
-            progressReporter.Report(100);
+            progressReporter.Complete();
         }
     }
 
@@ -254,10 +275,18 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
     public void ResignFiles(string inputDir, string userIdInput, string userIdOutput, CancellationTokenSource cts)
     {
         // GET FILES TO PROCESS
-        var filesToProcess = SaveDataFileIo.GetFiles(inputDir);
-        if (filesToProcess.Length == 0) return;
+        string[] filesToProcess;
+        try { filesToProcess = SaveDataFileIo.GetFiles(inputDir); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex.Message);
+            return;
+        }
+        // INITIALIZE PROGRESS TRACKER
+        var progressTracker = new ProgressTracker(filesToProcess.Length);
+        var errorCounter = new ErrorCounter(logger);
         // PROCESS FILES
-        logger.LogInfo($"Processing [{filesToProcess.Length}] files...");
+        logger.LogInfo($"Processing [{progressTracker.Total}] files...");
         // Get signature from Steam ID
         var steamIdInput = new SteamId(userIdInput);
         var steamIdOutput = new SteamId(userIdOutput);
@@ -269,7 +298,6 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
         // Setup parallel options
         var po = GetParallelOptions(cts);
         // Process files in parallel
-        var progress = 0;
         try
         {
             Parallel.For((long)0, filesToProcess.Length, po, (ctr, _) =>
@@ -284,8 +312,8 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     try { data = File.ReadAllBytes(filesToProcess[ctr]); }
                     catch (Exception ex)
                     {
-                        logger.LogError($"[{progress}/{filesToProcess.Length}] Failed to read the [{fileName}] file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to read the [{fileName}] file: {ex}", group);
+                        break;
                     }
                     // Process file data
                     var dataSpan = data.AsSpan();
@@ -299,25 +327,24 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError($"Failed to save the file: {ex}", group);
-                        break; // Skip to the next file
+                        errorCounter.AddError($"{progressTracker} Failed to save the file: {ex}", group);
+                        break;
                     }
-                    logger.LogInfo($"[{progress}/{filesToProcess.Length}] Re-signed the [{fileName}] file.", group);
+                    logger.LogInfo($"{progressTracker} Re-signed the [{fileName}] file.", group);
                     break;
                 }
-                Interlocked.Increment(ref progress);
-                progressReporter.Report((int)((double)progress / filesToProcess.Length * 100));
+                progressTracker.Increment();
+                progressReporter.Report(progressTracker.Percentage);
             });
-            logger.LogInfo($"[{progress}/{filesToProcess.Length}] All tasks completed.");
+            LogAllTasksCompleted(progressTracker, errorCounter);
         }
         catch (OperationCanceledException ex)
         {
-            logger.LogWarning(ex.Message);
+            errorCounter.AddWarning(ex.Message);
         }
         finally
         {
-            // Ensure progress is set to 100% at the end
-            progressReporter.Report(100);
+            progressReporter.Complete();
         }
     }
 
@@ -325,23 +352,25 @@ public class Core(SimpleLogger logger, ProgressReporter progressReporter)
     /// Asynchronously attempts to guess the UserID from the specified input directory.
     /// </summary>
     /// <param name="inputDir">The input directory containing the files to process.</param>
-    /// <param name="cts">The cancellation token source.</param>
     /// <returns>The guessed UserID if successful; otherwise, <see langword="null"/>.</returns>
-    public async Task<ulong?> GuessUserIdAsync(string inputDir, CancellationTokenSource cts)
-        => await Task.Run(() => GuessUserId(inputDir, cts));
+    public async Task<ulong?> GuessUserIdAsync(string inputDir)
+        => await Task.Run(() => GuessUserId(inputDir));
 
     /// <summary>
     /// Attempts to guess the UserID from the specified input directory.
     /// </summary>
     /// <param name="inputDir">The input directory containing the files to process.</param>
-    /// <param name="cts">The cancellation token source.</param>
     /// <returns>The guessed UserID if successful; otherwise, <see langword="null"/>.</returns>
-    public ulong? GuessUserId(string inputDir, CancellationTokenSource cts)
+    public ulong? GuessUserId(string inputDir)
     {
         // GET FILES TO PROCESS
-        var def = new IndexSaveDefinition();
-        var filesToProcess = Directory.GetFiles(inputDir, def.FullFileName, SearchOption.AllDirectories);
-        if (filesToProcess.Length == 0) return null;
+        string[] filesToProcess;
+        try { filesToProcess = SaveDataFileIo.GetIndexFiles(inputDir); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex.Message);
+            return null;
+        }
         // PROCESS FILE
         var file = filesToProcess[0];
         var fileName = Path.GetFileName(file);
